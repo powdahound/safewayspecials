@@ -1,11 +1,11 @@
 <?php
+  define(COOKIE_FILE, "/tmp/safewayspecials_cookies.txt");
   header("Content-type: text/xml");
 
   function curl_hitUrl($url, $postData = null) {
     $userAgent = "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.1) Gecko/20061204 Firefox/2.0.0.1";
 
     $h = curl_init();
-
     curl_setopt($h, CURLOPT_USERAGENT, $userAgent);
     curl_setopt($h, CURLOPT_URL, $url);
     curl_setopt($h, CURLOPT_FAILONERROR, 1);
@@ -13,8 +13,8 @@
     curl_setopt($h, CURLOPT_RETURNTRANSFER,1);     // return into a variable
     curl_setopt($h, CURLOPT_TIMEOUT, 15);          // times out after 15s
     curl_setopt($h, CURLOPT_FOLLOWLOCATION, 1);
-    curl_setopt($h, CURLOPT_COOKIEJAR, dirname(__FILE__).'/cookies.txt');
-    curl_setopt($h, CURLOPT_COOKIEFILE, dirname(__FILE__).'/cookies.txt');
+    curl_setopt($h, CURLOPT_COOKIEJAR, COOKIE_FILE);
+    curl_setopt($h, CURLOPT_COOKIEFILE, COOKIE_FILE);
 
     if ($postData != null) {
       curl_setopt($h, CURLOPT_POSTFIELDS, http_build_query($postData));
@@ -27,7 +27,7 @@
   }
 
   function safeway_clearCookies() {
-    $h = fopen(dirname(__FILE__).'/cookies.txt', 'w');
+    $h = fopen(COOKIE_FILE, 'w');
     fwrite($h, '');
     fclose($h);
   }
