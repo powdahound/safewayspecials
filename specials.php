@@ -1,6 +1,5 @@
 <?php
   header("Content-type: text/xml");
-  echo '<?xml version="1.0" encoding="UTF-8"?>';
 
   function curl_hitUrl($url, $postData = null) {
     $userAgent = "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.1) Gecko/20061204 Firefox/2.0.0.1";
@@ -33,91 +32,95 @@
     fclose($h);
   }
 
-  function safeway_locateStore($zip) {
-    $postData = array();
-    $postData['postalcode']  = $zip;
-    $postData['brand']       = 'shop.safeway.com';
-    $postData['mode']        = 'zip';
-    $postData['miles']       = 7;
-    $postData['limit']       = 9;
-    $postData['LocateStore'] = 1;
-
-    $results = curl_hitUrl("http://shop.safeway.com/corporate/storefinder/storeResults.asp", $postData);
+  function safeway_getCategories($storeId) {
+    $data = curl_hitUrl("http://safeway.inserts2online.com/main_508.jsp?drpStoreID=1108");
     
-    return $results;
+    preg_match_all('/itemResult_508\.jsp\?catSearch=(.+)">/', $data, $matches);
+
+    foreach ($matches[1] as $match) {
+      $cats[] = urldecode($match);
+    }
+
+    return $cats;
   }
-  
+
   function safeway_getSpecials($storeId) {
     $specials = array();
-    
+
     // hit this URL to gather necessary cookies
-    curl_hitUrl("http://safeway1.inserts2online.com/storeReview.jsp?drpStoreID=$storeId");
-    
-    // get the specials on each page and add them to the list
-    for ($i = 0; $i < 8; $i++) {
-      $pageSpecials = safeway_getSpecialsOnPage($storeId, $i);
-      
-      foreach ($pageSpecials as $special) {
+    curl_hitUrl("http://safeway.inserts2online.com/storeReview.jsp?drpStoreID=$storeId&showFlash=false");
+
+    $categories = safeway_getCategories($storeId);
+
+    foreach ($categories as $category) {
+      $categorySpecials = safeway_getSpecialsInCategory($category);
+      foreach ($categorySpecials as $special) {
         $specials[] = $special;
       }
     }
-    
+
     return $specials;
   }
 
-  function safeway_getSpecialsOnPage($storeId, $pageNum) {
-    $specials = array();
-    
-    $data = curl_hitUrl("http://safeway1.inserts2online.com/pageLarge.jsp?pageNumber=$pageNum&drpStoreId=$storeId");
-    
-    preg_match_all('/<script>temp(.*)<\/script>/', $data, $matches);
-    
+  function safeway_getSpecialsInCategory($category) {
+    $data = curl_hitUrl("http://safeway.inserts2online.com/itemResult_508.jsp?showAllItem=100&catSearch=".urlencode($category));
+
+    // each row in table represends a single special
+    preg_match_all('/<tr class="(?:odd|even)Color">(.+)<\/tr>/sU', $data, $matches);
+
     foreach ($matches[1] as $str) {
       $specialData = safeway_parseSpecial($str);
       
       if ($specialData) {
+        $specialData['category'] = $category;
         $specials[] = $specialData;
       }
     }
     
     return $specials;
   }
-  
+
   function safeway_parseSpecial($data) {
     $special = array();
-    // <script>temp0 = escape("<table class=Main><tr><td valign=top width=65%><div class=Header1> Tropicana Pure Premium </div><div class=Description>   59 to 64-oz.  Chilled orange juice. Selected varieties.</div><div class=Price2> CLUB PRICE  SAVE up to $5.99 on 2 </div></td><td align=right valign=top><img src='SafewaySafeway07182007NorCal/items/small/01_25WIN29_N1-33.jpg'><div class=Price>BUY ONE, GET ONE FREE</div></td></tr></table>");</script>
-    
-    if (preg_match('/Header1>(.*)<\/div>/U', $data, $matches))
+
+    if (preg_match('/id="itemName\d+">(.+)<\//U', $data, $matches)) {
       $special['name'] = htmlspecialchars(trim($matches[1]));
-    else return null;
+    } else {
+      return null;
+    }
     
-    if (preg_match('/Description>(.*)<\/div>/U', $data, $matches))
+    if (preg_match('/width="\*">(.*)<\/td>/U', $data, $matches)) {
       $special['desc'] = trim($matches[1]);
-    else return null;
+    } else {
+      return null;
+    }
 
-    if (preg_match('/Price>(.*)<\/div>/U', $data, $matches))
+    if (preg_match('/id="itemPrice\d+".+>(.*)<\/td>/U', $data, $matches)) {
       $special['price'] = trim($matches[1]);
-    else return null;
+    } else {
+      return null;
+    }
     
-    if (preg_match('/Price2>(.*)<\/div>/U', $data, $matches))
-      $special['price2'] = trim($matches[1]);
-    else return null;
+    if (preg_match('/width="20%">(.*)<\/td>/U', $data, $matches)) {
+      $special['savings'] = trim($matches[1]);
+    } else {
+      return null;
+    }
 
-    if (preg_match('/img src=\'(.*)\'>/U', $data, $matches))
-      $special['image'] = trim($matches[1]);
-    else return null;
-    
+    if (preg_match('/width="80px">(.*)<\/td>/U', $data, $matches)) {
+      $special['date'] = trim($matches[1]);
+    } else {
+      return null;
+    }
+
     return $special;
   }
   
   // get valid through date
-  function safeway_getValidThroughDate($storeId) {
-    $data = curl_hitUrl("http://safeway1.inserts2online.com/pageLarge.jsp?pageNumber=1&drpStoreId=$storeId");
-
-    // <span style='width:100%' class='pricesgood'>Prices Valid Through&nbsp;07/24/2007</span>
-    preg_match('/Prices Valid Through&nbsp;(\d*)\/(\d*)\/(\d*)<\/span>/', $data, $matches);
-    
-    return mktime(0, 0, 0, $matches[1], $matches[2], $matches[3]);
+  function safeway_getValidThroughDate($specials) {
+    $date = $specials[0]['date'];
+    list($start, $end) = explode('-', $date);
+    return strtotime($end);
   }
 
 
@@ -127,16 +130,15 @@
 
   safeway_clearCookies();
 
-  //$stores = safeway_locateStore($_GET['zip']);
-  
   $storeId = isset($_GET['storeId']) ? $_GET['storeId'] : 1108;
-
+  
   $specials = safeway_getSpecials($storeId);
-  $validThrough = safeway_getValidThroughDate($storeId);
+  $validThrough = safeway_getValidThroughDate($specials);
   $pubDate = date(date('U', $validThrough) - (7 * 24 * 3600));
   $validThroughDate = date('l F j, Y', $validThrough);
   $weekOfSpecials = date('l F j, Y', $pubDate);
 
+  echo '<?xml version="1.0" encoding="UTF-8"?>';
 ?>
 
 <rss version="2.0">
@@ -162,21 +164,16 @@
   
   <?
   foreach ($specials as $special) {
-    echo '<item>';
-    echo '<title>'.$special['name'].'</title>';
-    
-    echo '<description><![CDATA[';
-    
-    echo   $special['desc'].'<br />';
-    echo   $special['price'].'<br />';
-    echo   $special['price2'].'<br />';
-    echo   '<img src="http://safeway1.inserts2online.com/'.$special['image'].'"><br />';
-    echo   'Expires: '.$validThroughDate;
-    
-    echo ']]></description>';
-    echo '</item>';
-    
-    echo "\n\n";
+    echo "  <item>\n";
+    echo "    <title>".$special["name"]."</title>\n";
+    echo "    <description><![CDATA[\n";
+    echo "    Description: ".$special["desc"]."<br />\n";
+    echo "    Category: ".$special["category"]."<br />\n";
+    echo "    Price: ".$special["price"]."<br />\n";
+    echo "    Savings: ".$special["savings"]."<br />\n";
+    echo "    Price valid: ".$special["date"]."<br />\n";
+    echo "    ]]></description>\n";
+    echo "  </item>\n";
   }
   ?>
 </channel>
