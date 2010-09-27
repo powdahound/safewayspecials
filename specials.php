@@ -1,5 +1,5 @@
 <?php
-  define(COOKIE_FILE, "/tmp/safewayspecials_cookies.txt");
+  define('COOKIE_FILE', "/tmp/safewayspecials_cookies.txt");
   header("Content-type: text/xml");
 
   function curl_hitUrl($url, $postData = null) {
@@ -20,7 +20,7 @@
       curl_setopt($h, CURLOPT_POSTFIELDS, http_build_query($postData));
       curl_setopt($h, CURLOPT_POST, 1);
     }
-     
+
     $doc = curl_exec($h);
 
     return $doc;
@@ -34,7 +34,7 @@
 
   function safeway_getCategories($storeId) {
     $data = curl_hitUrl("http://safeway.inserts2online.com/main_508.jsp?drpStoreID=1108");
-    
+
     preg_match_all('/itemResult_508\.jsp\?catSearch=(.+)">/', $data, $matches);
 
     foreach ($matches[1] as $match) {
@@ -53,7 +53,7 @@
     $categories = safeway_getCategories($storeId);
 
     foreach ($categories as $category) {
-      $categorySpecials = safeway_getSpecialsInCategory($category);
+      $categorySpecials = (array)safeway_getSpecialsInCategory($category);
       foreach ($categorySpecials as $special) {
         $specials[] = $special;
       }
@@ -68,15 +68,16 @@
     // each row in table represends a single special
     preg_match_all('/<tr class="(?:odd|even)Color">(.+)<\/tr>/sU', $data, $matches);
 
+    $specials = array();
     foreach ($matches[1] as $str) {
       $specialData = safeway_parseSpecial($str);
-      
+
       if ($specialData) {
         $specialData['category'] = $category;
         $specials[] = $specialData;
       }
     }
-    
+
     return $specials;
   }
 
@@ -88,7 +89,7 @@
     } else {
       return null;
     }
-    
+
     if (preg_match('/width="\*">(.*)<\/td>/U', $data, $matches)) {
       $special['desc'] = trim($matches[1]);
     } else {
@@ -100,7 +101,7 @@
     } else {
       return null;
     }
-    
+
     if (preg_match('/width="20%">(.*)<\/td>/U', $data, $matches)) {
       $special['savings'] = trim($matches[1]);
     } else {
@@ -115,7 +116,7 @@
 
     return $special;
   }
-  
+
   // get valid through date
   function safeway_getValidThroughDate($specials) {
     $date = $specials[0]['date'];
@@ -131,7 +132,7 @@
   safeway_clearCookies();
 
   $storeId = isset($_GET['storeId']) ? $_GET['storeId'] : 1108;
-  
+
   $specials = safeway_getSpecials($storeId);
   $validThrough = safeway_getValidThroughDate($specials);
   $pubDate = date(date('U', $validThrough) - (7 * 24 * 3600));
@@ -161,11 +162,11 @@
     <day>Saturday</day>
     <day>Sunday</day>
   </skipDays>
-  
+
   <?
   foreach ($specials as $special) {
     echo "  <item>\n";
-    echo "    <title>".$special["name"]."</title>\n";
+    echo "    <title>".htmlentities($special["name"])."</title>\n";
     echo "    <description><![CDATA[\n";
     echo "    Description: ".$special["desc"]."<br />\n";
     echo "    Category: ".$special["category"]."<br />\n";
