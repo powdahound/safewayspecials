@@ -147,9 +147,9 @@
   <language>en</language>
   <title>Safeway Weekly Specials</title>
   <link>http://www.powdahound.com/safeway-specials/</link>
-  <description>Safeway specials for the week starting on <?= $weekOfSpecials ?> (Store: <?= $storeId ?>)</description>
-  <pubDate><?= date('D, d M Y G:i:s', $pubDate) ?> PST</pubDate>
-  <lastBuildDate><?= date('D, d M Y G:i:s', $pubDate) ?> PST</lastBuildDate>
+  <description>Safeway specials for the week starting on <?php echo $weekOfSpecials ?> (Store: <?php echo $storeId ?>)</description>
+  <pubDate><?php echo date('D, d M Y G:i:s', $pubDate) ?> PST</pubDate>
+  <lastBuildDate><?php echo date('D, d M Y G:i:s', $pubDate) ?> PST</lastBuildDate>
   <image>
     <url>http://www.powdahound.com/safeway-specials/safeway.gif</url>
     <title>Safeway</title>
@@ -163,7 +163,7 @@
     <day>Sunday</day>
   </skipDays>
 
-  <?
+  <?php
   foreach ($specials as $special) {
     echo "  <item>\n";
     echo "    <title>".htmlentities($special["name"])."</title>\n";
